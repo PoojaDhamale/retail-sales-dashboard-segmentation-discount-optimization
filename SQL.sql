@@ -111,7 +111,7 @@ GROUP BY customer_id
 ORDER BY frequency DESC;
 
 -- ================================
--- 9. Average Order Value (AOV) and Customer Lifetime Value (CLV)
+-- 9. Average Order Value (AOV) 
 -- ================================
 
 SELECT 
@@ -119,15 +119,6 @@ ROUND(SUM(s.quantity * p.price) / COUNT(DISTINCT s.transaction_id), 2) AS avg_or
 FROM sales s
 JOIN products p ON s.product_id = p.product_id;
 
-SELECT 
-    c.customer_id,
-    c.customer_name,
-    SUM(s.quantity * p.price * (1 - s.discount / 100.0)) AS Customer_Lifetime_Value
-FROM sales s
-JOIN customers c ON s.customer_id = c.customer_id
-JOIN products p ON s.product_id = p.product_id
-GROUP BY c.customer_id, c.customer_name
-ORDER BY Customer_Lifetime_Value DESC;
 
 
 -- ================================
