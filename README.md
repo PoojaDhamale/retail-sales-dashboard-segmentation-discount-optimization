@@ -84,7 +84,7 @@ This is an end-to-end **data analytics project** focused on analyzing and optimi
 ## 👩‍💻 **Author**
 
 **Pooja Dhamale**
-*Aspirant Data Analyst*
+*Aspiring Data Analyst*
 **Skills:** SQL | Power BI | Data Visualization
 
 ---
