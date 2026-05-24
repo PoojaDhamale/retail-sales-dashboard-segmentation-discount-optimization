@@ -66,7 +66,7 @@ This is an end-to-end **data analytics project** focused on analyzing and optimi
 
 ## 📊 **Key Insights**
 
-* **0–5% discounts** generate the highest revenue (optimal pricing range)
+* **No Discount** generates the highest revenue; discounted buckets contribute less, and no clear evidence shows 0–5% as optimal.
 * **High-value customers** contribute a major share of revenue
 * **Top product categories** drive the majority of sales
 * **Regional performance differences** highlight growth opportunities
