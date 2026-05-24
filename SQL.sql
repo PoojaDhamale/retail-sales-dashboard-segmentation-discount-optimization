@@ -243,21 +243,27 @@ ORDER BY lifetime_value DESC;
 WITH rfm AS (
   SELECT
     c.customer_id,
-    MAX(s.sale_date) AS last_purchase,
-    COUNT(DISTINCT s.transaction_id) AS frequency,
     SUM(s.quantity * p.price) AS monetary
   FROM sales s
   JOIN customers c ON s.customer_id = c.customer_id
   JOIN products p ON s.product_id = p.product_id
   GROUP BY c.customer_id
+),
+seg AS (
+  SELECT *,
+    CASE
+      WHEN monetary > 50000 THEN 'High Value'
+      WHEN monetary > 20000 THEN 'Medium Value'
+      ELSE 'Low Value'
+    END AS segment
+  FROM rfm
 )
-SELECT *,
-  CASE
-    WHEN frequency >= 10 AND monetary > 50000 THEN 'High Value'
-    WHEN frequency >= 5 THEN 'Medium Value'
-    ELSE 'Low Value'
-  END AS customer_segment
-FROM rfm;
+SELECT
+  segment,
+  SUM(monetary) AS revenue,
+  ROUND(100.0 * SUM(monetary) / SUM(SUM(monetary)) OVER (), 2) AS revenue_share
+FROM seg
+GROUP BY segment;
 
 -- ================================
 -- 20. Repeat vs One-time Customers
