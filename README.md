@@ -64,15 +64,6 @@ This is an end-to-end **data analytics project** focused on analyzing and optimi
 
 ---
 
-## 📊 **Key Insights**
-
-* **No Discount** generates the highest revenue; discounted buckets contribute less.
-* **High-value customers** contribute a major share of revenue
-* **Top product categories** drive the majority of sales
-* **Regional performance differences** highlight growth opportunities
-
----
-
 ## 📈 **Results**
 
 * Delivered actionable insights for **sales optimization and pricing strategy**
