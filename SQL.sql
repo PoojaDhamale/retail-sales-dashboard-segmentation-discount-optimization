@@ -13,12 +13,30 @@ SET discount =
         ELSE 0
     END;
 
+-- Note: ~25% of rows have NULL/non-numeric discount_percent.
+-- Treated as 0% discount (no discount applied) rather than dropped,
+-- since a missing discount value is the more conservative and
+-- defensible default for revenue calculations.
+
 -- ================================
 -- 2. Remove Old Column
 -- ================================
 
 ALTER TABLE sales 
 DROP COLUMN discount_percent;
+
+-- ================================
+-- 2b. Data Quality Fix — Invalid Quantities
+-- ================================
+-- Data audit found 9,254 rows (18.5% of all transactions) with
+-- quantity = -1. Every negative value
+-- is exactly -1 with the same discount-null rate as valid rows, which
+-- is the signature of synthetic data noise, not real return transactions.
+-- Removing them once at the source rather than repeating
+-- "WHERE quantity > 0" across every downstream query.
+
+DELETE FROM sales
+WHERE quantity <= 0;
 
 -- ================================
 -- 3. Full Transaction View
@@ -237,33 +255,57 @@ GROUP BY c.customer_id, c.customer_name
 ORDER BY lifetime_value DESC;
 
 -- ================================
--- 19. RFM Segmentation
--- ================================
+-- 19. RFM Segmentation 
+-- ================================.
 
-WITH rfm AS (
+WITH rfm_raw AS (
   SELECT
     c.customer_id,
-    SUM(s.quantity * p.price) AS monetary
+    MAX(s.sale_date)                       AS last_purchase_date,
+    (SELECT MAX(sale_date) FROM sales)
+      - MAX(s.sale_date)                   AS recency_days,
+    COUNT(DISTINCT s.transaction_id)       AS frequency,
+    SUM(s.quantity * p.price
+        * (1 - s.discount/100.0))          AS monetary
   FROM sales s
   JOIN customers c ON s.customer_id = c.customer_id
   JOIN products p ON s.product_id = p.product_id
   GROUP BY c.customer_id
 ),
+rfm_scored AS (
+  SELECT
+    customer_id,
+    recency_days,
+    frequency,
+    monetary,
+    -- Lower recency_days = more recent = better score, so order ASC
+    NTILE(4) OVER (ORDER BY recency_days ASC)  AS r_score,
+    NTILE(4) OVER (ORDER BY frequency DESC)    AS f_score,
+    NTILE(4) OVER (ORDER BY monetary DESC)     AS m_score
+  FROM rfm_raw
+),
 seg AS (
   SELECT *,
+    (r_score + f_score + m_score) AS rfm_total,
     CASE
-      WHEN monetary > 50000 THEN 'High Value'
-      WHEN monetary > 20000 THEN 'Medium Value'
-      ELSE 'Low Value'
+      WHEN r_score <= 2 AND f_score <= 2 AND m_score <= 2 THEN 'Champions'
+      WHEN m_score <= 2 AND f_score <= 2 THEN 'High Value'
+      WHEN r_score >= 3 THEN 'At Risk / Churning'
+      ELSE 'Medium Value'
     END AS segment
-  FROM rfm
+  FROM rfm_scored
 )
 SELECT
   segment,
-  SUM(monetary) AS revenue,
+  COUNT(*) AS customers,
+  ROUND(AVG(monetary), 2) AS avg_monetary,
+  ROUND(AVG(frequency), 1) AS avg_frequency,
+  ROUND(AVG(recency_days), 0) AS avg_recency_days,
+  SUM(monetary) AS total_revenue,
   ROUND(100.0 * SUM(monetary) / SUM(SUM(monetary)) OVER (), 2) AS revenue_share
 FROM seg
-GROUP BY segment;
+GROUP BY segment
+ORDER BY total_revenue DESC;
 
 -- ================================
 -- 20. Repeat vs One-time Customers
