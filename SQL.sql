@@ -181,16 +181,19 @@ JOIN products p ON s.product_id = p.product_id;
 
 SELECT
   CASE
-    WHEN discount = 0 THEN 'No Discount'
-    WHEN discount <= 5 THEN '0-5%'
-    WHEN discount <= 15 THEN '5-15%'
-    ELSE '15%+'
-  END AS discount_bucket,
-  ROUND(SUM(s.quantity * p.price), 2) AS revenue
+    WHEN s.discount <= 0  THEN '0%'
+    WHEN s.discount <= 5  THEN '1-5%'
+    WHEN s.discount <= 10 THEN '6-10%'
+    WHEN s.discount <= 15 THEN '11-15%'
+    WHEN s.discount <= 20 THEN '16-20%'
+    WHEN s.discount <= 30 THEN '21-30%'
+    ELSE 'Above 30%'
+  END AS discount_range,
+  ROUND(SUM(s.quantity * p.price * (1 - s.discount/100.0)), 2) AS net_revenue
 FROM sales s
 JOIN products p ON s.product_id = p.product_id
-GROUP BY discount_bucket
-ORDER BY revenue DESC;
+GROUP BY discount_range
+ORDER BY MIN(s.discount);
 
 -- ================================
 -- 14. Sales by Weekday (Sorted)
@@ -204,19 +207,34 @@ GROUP BY weekday, EXTRACT(DOW FROM sale_date)
 ORDER BY EXTRACT(DOW FROM sale_date);
 
 -- ================================
--- 15. Customer Type (New vs Old)
+-- 15. Conversion Speed (Fast vs Slow Converter)
 -- ================================
+-- Fast Converter = customer's FIRST purchase within 90 days of signup.
+-- Matches the Power BI "Conversion Speed" column.
 
-SELECT 
-CASE 
-  WHEN s.sale_date - c.signup_date <= 90 THEN 'New Customer'
-  ELSE 'Old Customer'
-END AS customer_type,
-SUM(s.quantity * p.price) AS revenue
-FROM sales s
-JOIN customers c ON s.customer_id = c.customer_id
+WITH first_purchase AS (
+  SELECT customer_id, MIN(sale_date) AS first_sale_date
+  FROM sales
+  GROUP BY customer_id
+),
+customer_speed AS (
+  SELECT
+    c.customer_id,
+    CASE
+      WHEN fp.first_sale_date - c.signup_date <= 90 THEN 'Fast Converter'
+      ELSE 'Slow Converter'
+    END AS conversion_speed
+  FROM customers c
+  JOIN first_purchase fp ON c.customer_id = fp.customer_id
+)
+SELECT
+  cs.conversion_speed,
+  COUNT(DISTINCT cs.customer_id) AS customers,
+  ROUND(SUM(s.quantity * p.price * (1 - s.discount/100.0)), 2) AS net_revenue
+FROM customer_speed cs
+JOIN sales s ON s.customer_id = cs.customer_id
 JOIN products p ON s.product_id = p.product_id
-GROUP BY customer_type;
+GROUP BY cs.conversion_speed;
 
 -- ================================
 -- 16. Running Revenue (Window Function)
